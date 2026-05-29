@@ -32,4 +32,31 @@ The selection of embedded `.lua` files was determined by analyzing the source st
 - **Rationale:** While the core JSON logic is in C, the module often includes utility Lua scripts. `cjson.util` was bundled to provide the standard utility suite.
 
 ### 4. LuaFileSystem (Pure C)
-- **Analysis:** LFS is a pure C module. Its entire API is contained within the compiled C archive, requiring no supplemental `.lua` files for operation.
+- Analysis:** LFS is a pure C module. Its entire API is contained within the compiled C archive, requiring no supplemental `.lua` files for operation.
+
+## Performance Considerations: Startup Speed
+
+Bundling and pre-loading modules does not negatively impact the startup speed of `standalone-luajit`. In many cases, it is faster than a standard LuaJIT installation.
+
+### 1. Lazy Loading via `package.preload`
+Registering modules in `package.preload` is a lightweight operation that merely adds an entry to a lookup table. The actual module code is **not** executed or loaded into the Lua state until the first time `require("name")` is called in a script. If a module is never required, it consumes zero CPU time during the session.
+
+### 2. Elimination of Disk I/O
+A standard `require` call triggers a search of the filesystem (`LUA_PATH`/`LUA_CPATH`), involving multiple system calls and disk reads. In the standalone binary:
+- **Search:** Instantaneous hash table lookup in memory.
+- **Load:** Direct memory copy from the binary's data segment, bypassing all disk I/O.
+
+### 3. Pre-compiled Bytecode
+All bundled Lua modules are stored as **pre-compiled bytecode**. This allows the VM to skip the parsing and compilation phase that occurs when loading standard `.lua` source files, leading to faster module initialization.
+
+### 4. Minimal Registration Overhead
+The startup overhead consists of approximately 20 table insertions in `package.preload`. This process takes only a few microseconds and is negligible compared to the overall initialization of the LuaJIT VM.
+
+### Comparison Summary
+| Feature | Standard LuaJIT | Standalone LuaJIT |
+| :--- | :--- | :--- |
+| **Module Search** | Filesystem crawl (Slow) | Memory lookup (Instant) |
+| **Module Loading** | Disk I/O | Memory segment (Fast) |
+| **Processing** | Source parsing/compilation | Bytecode loading (Faster) |
+| **Startup Overhead** | Negligible | Negligible (~20 table entries) |
+
