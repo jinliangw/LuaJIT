@@ -10,3 +10,6 @@
 *.dmp
 *.swp
 .tags
+build-arm64/
+dockcross-linux-arm64
+test_standalone.lua
