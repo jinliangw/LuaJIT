@@ -80,6 +80,9 @@ dx_run "aarch64-unknown-linux-gnu-gcc -O2 -static -I$BUILD_DIR/include \
        -lm -ldl -lpthread \
        -o $BUILD_DIR/standalone-luajit"
 
+echo "Stripping standalone-luajit..."
+dx_run "aarch64-unknown-linux-gnu-strip $BUILD_DIR/standalone-luajit"
+
 # Restore lua_cjson.c after build
 echo "Restoring lua_cjson.c..."
 cd external/lua-cjson && git checkout lua_cjson.c && cd ../..
