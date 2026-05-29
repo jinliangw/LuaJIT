@@ -204,6 +204,7 @@ static void print_usage(void)
   "  -O[opt]   Control LuaJIT optimizations.\n"
   "  -i        Enter interactive mode after executing " LUA_QL("script") ".\n"
   "  -v        Show version information.\n"
+  "  -m        Print supported modules.\n"
   "  -E        Ignore environment variables.\n"
   "  --        Stop handling options.\n"
   "  -         Execute stdin and stop handling options.\n", stderr);
@@ -263,6 +264,23 @@ static int docall(lua_State *L, int narg, int clear)
 static void print_version(void)
 {
   fputs(LUAJIT_VERSION " -- " LUAJIT_COPYRIGHT ". " LUAJIT_URL "\n", stdout);
+}
+
+static void print_supported_modules(lua_State *L)
+{
+  printf("Standard modules:\n");
+  printf("  base, bit, debug, ffi, io, jit, math, os, package, string, table\n\n");
+  printf("Bundled modules:\n");
+  lua_getglobal(L, "package");
+  lua_getfield(L, -1, "preload");
+  lua_pushnil(L);
+  while (lua_next(L, -2) != 0) {
+    if (lua_isstring(L, -2)) {
+      printf("  %s\n", lua_tostring(L, -2));
+    }
+    lua_pop(L, 1);
+  }
+  lua_pop(L, 2);
 }
 
 static void print_jit_status(lua_State *L)
@@ -529,6 +547,7 @@ static int dobytecode(lua_State *L, char **argv)
 #define FLAGS_EXEC		4
 #define FLAGS_OPTION		8
 #define FLAGS_NOENV		16
+#define FLAGS_LIST_MODS		32
 
 static int collectargs(char **argv, int *flags)
 {
@@ -549,6 +568,10 @@ static int collectargs(char **argv, int *flags)
     case 'v':
       notail(argv[i]);
       *flags |= FLAGS_VERSION;
+      break;
+    case 'm':
+      notail(argv[i]);
+      *flags |= FLAGS_LIST_MODS;
       break;
     case 'e':
       *flags |= FLAGS_EXEC;
@@ -674,6 +697,7 @@ static int pmain(lua_State *L)
   }
 
   if ((flags & FLAGS_VERSION)) print_version();
+  if ((flags & FLAGS_LIST_MODS)) print_supported_modules(L);
 
   s->status = runargs(L, argv, argn);
   if (s->status != LUA_OK) return 0;
@@ -686,7 +710,7 @@ static int pmain(lua_State *L)
   if ((flags & FLAGS_INTERACTIVE)) {
     print_jit_status(L);
     dotty(L);
-  } else if (s->argc == argn && !(flags & (FLAGS_EXEC|FLAGS_VERSION))) {
+  } else if (s->argc == argn && !(flags & (FLAGS_EXEC|FLAGS_VERSION|FLAGS_LIST_MODS))) {
     if (lua_stdin_is_tty()) {
       print_version();
       print_jit_status(L);
