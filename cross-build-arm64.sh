@@ -46,11 +46,6 @@ dx_run "cd external/luafilesystem && \
 
 # lua-cjson
 echo "Building lua-cjson..."
-# Patch lua_cjson.c to avoid conflict with LuaJIT's luaL_setfuncs (only if not already patched)
-if ! grep -q "cjson_luaL_setfuncs" external/lua-cjson/lua_cjson.c; then
-    sed -i 's/static void luaL_setfuncs/static void cjson_luaL_setfuncs/' external/lua-cjson/lua_cjson.c
-    sed -i 's/luaL_setfuncs(l, reg, 1)/cjson_luaL_setfuncs(l, reg, 1)/' external/lua-cjson/lua_cjson.c
-fi
 dx_run "cd external/lua-cjson && \
        aarch64-unknown-linux-gnu-gcc -O2 -I../../src -c lua_cjson.c -o lua_cjson.o && \
        aarch64-unknown-linux-gnu-gcc -O2 -I../../src -c strbuf.c -o strbuf.o && \
@@ -135,9 +130,5 @@ dx_run "aarch64-unknown-linux-gnu-gcc -O2 -static -I$BUILD_DIR/include \
 
 echo "Stripping standalone-luajit..."
 dx_run "aarch64-unknown-linux-gnu-strip $BUILD_DIR/standalone-luajit"
-
-# Restore lua_cjson.c after build
-echo "Restoring lua_cjson.c..."
-cd external/lua-cjson && git checkout lua_cjson.c && cd ../..
 
 echo "Build complete! Binary located at $BUILD_DIR/standalone-luajit"
