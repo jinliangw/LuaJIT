@@ -52,6 +52,7 @@ static void signal_set(int sig, void (*h)(int))
 // External module declarations
 int luaopen_lfs(lua_State *L);
 int luaopen_cjson(lua_State *L);
+int luaopen_cjson_safe(lua_State *L);
 int luaopen_socket_core(lua_State *L);
 int luaopen_mime_core(lua_State *L);
 
@@ -136,6 +137,9 @@ static void preload_modules(lua_State *L) {
 
     lua_pushcfunction(L, luaopen_cjson);
     lua_setfield(L, -2, "cjson");
+
+    lua_pushcfunction(L, luaopen_cjson_safe);
+    lua_setfield(L, -2, "cjson.safe");
 
     lua_pushcfunction(L, luaopen_socket_core);
     lua_setfield(L, -2, "socket.core");

@@ -62,3 +62,21 @@ The startup overhead consists of approximately 20 table insertions in `package.p
 | **Processing** | Source parsing/compilation | Bytecode loading (Faster) |
 | **Startup Overhead** | Negligible | Negligible (~20 table entries) |
 
+## Verification & Testing
+
+A comprehensive test suite is provided in the `standalone-tests/` directory to ensure the correctness of the standalone runtime and all integrated modules.
+
+### 1. Test Coverage
+- **Core LuaJIT (`test_core.lua`):** Verifies JIT availability, basic VM loops, and FFI functionality.
+- **LuaFileSystem (`test_lfs.lua`):** Executes the full LFS suite for directory and file operations.
+- **lua-cjson (`test_cjson.lua`):** A massive suite (105 tests) for JSON encoding/decoding, UTF-8, and `cjson.safe`.
+- **LuaSocket (`test_socket_*.lua`):** Verifies `url`, `mime`, and `ltn12` modules.
+
+### 2. Automated Test Runner
+The `run_tests.sh` script automates the execution of the entire suite using the arm64 binary via QEMU within the dockcross container. It ensures correct path resolution for `dofile` and data files.
+
+**How to run:**
+```bash
+./standalone-tests/run_tests.sh
+```
+
