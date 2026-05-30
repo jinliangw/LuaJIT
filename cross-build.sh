@@ -16,6 +16,7 @@ case $TARGET in
         CROSS_FILE="arm64-cross.ini"
         CROSS_PREFIX="aarch64-unknown-linux-gnu-"
         MAKE_FLAGS=""
+        QEMU="qemu-aarch64"
         ;;
     armv7sf)
         IMAGE="dockcross/linux-armv5"
@@ -23,12 +24,14 @@ case $TARGET in
         CROSS_PREFIX="armv5-unknown-linux-gnueabi-"
         EXTRA_CFLAGS="-march=armv7-a"
         MAKE_FLAGS="HOST_CC=${CROSS_PREFIX}gcc MINILUA_T='qemu-arm host/minilua' BUILDVM_T='qemu-arm host/buildvm' TARGET_CFLAGS='$EXTRA_CFLAGS'"
+        QEMU="qemu-arm"
         ;;
     x64)
         IMAGE="dockcross/linux-x64"
         CROSS_FILE="x64-cross.ini"
         CROSS_PREFIX="x86_64-linux-gnu-"
         MAKE_FLAGS=""
+        QEMU=""
         ;;
     *)
         echo "Unsupported target: $TARGET"
@@ -38,7 +41,6 @@ esac
 
 DOCKCROSS_BIN="./dockcross-$TARGET"
 BUILD_DIR="build-$TARGET"
-SRC_HOST="src-host"
 SRC_TARGET="src-target-$TARGET"
 
 # Ensure dockcross helper script exists
@@ -53,21 +55,7 @@ function dx_run() {
     "$DOCKCROSS_BIN" bash -c "$1"
 }
 
-echo "Building LuaJIT core (host and $TARGET)..."
-
-# Build host LuaJIT incrementally in a separate directory
-# This is used for bytecode bundling during the Meson build
-if [ ! -d "$SRC_HOST" ]; then
-    echo "Creating $SRC_HOST for incremental host build..."
-    cp -r src "$SRC_HOST"
-fi
-cp -u src/* "$SRC_HOST/" 2>/dev/null || true
-
-echo "Building host LuaJIT..."
-# We always build host LuaJIT as a native x86_64 binary for bundling.
-# Force CC=gcc to avoid any cross-compiler being picked up from the environment.
-# Also clean first to ensure no architecture pollution from previous target builds.
-dx_run "make -C $SRC_HOST clean && make -C $SRC_HOST -j$(nproc) CC=gcc HOST_CC=gcc BUILDMODE=static"
+echo "Building LuaJIT core ($TARGET)..."
 
 # Build target LuaJIT incrementally in a separate directory
 if [ ! -d "$SRC_TARGET" ]; then
@@ -83,27 +71,25 @@ dx_run "make -C $SRC_TARGET -j$(nproc) CROSS=$CROSS_PREFIX TARGET_SYS=Linux BUIL
 if [ ! -d "$BUILD_DIR" ]; then
     echo "Setting up Meson build directory $BUILD_DIR..."
     
-    # For 32-bit targets like armv7/armv5, we need a 32-bit luajit for bytecode bundling.
-    # The most reliable way is to use the target luajit via qemu.
-    if [[ "$TARGET" == armv* ]]; then
-        BUNDLE_LUAJIT="qemu-arm /work/$SRC_TARGET/luajit"
-        # We need to create a wrapper script because Meson find_program needs an executable
-        WRAPPER_HOST="$BUILD_DIR/luajit-wrapper.sh"
-        WRAPPER_CONTAINER="/work/$BUILD_DIR/luajit-wrapper.sh"
-        mkdir -p "$BUILD_DIR"
-        echo '#!/bin/bash' > "$WRAPPER_HOST"
-        echo "$BUNDLE_LUAJIT \"\$@\"" >> "$WRAPPER_HOST"
-        chmod +x "$WRAPPER_HOST"
-        HOST_LUAJIT_PATH="$WRAPPER_CONTAINER"
+    # Create a wrapper script because Meson find_program needs an executable.
+    # We use the target LuaJIT (possibly via QEMU) to compile bytecode.
+    WRAPPER_HOST="$BUILD_DIR/luajit-wrapper.sh"
+    WRAPPER_CONTAINER="/work/$BUILD_DIR/luajit-wrapper.sh"
+    mkdir -p "$BUILD_DIR"
+    echo '#!/bin/bash' > "$WRAPPER_HOST"
+    if [ -n "$QEMU" ]; then
+        echo "$QEMU /work/$SRC_TARGET/luajit \"\$@\"" >> "$WRAPPER_HOST"
     else
-        HOST_LUAJIT_PATH="/work/$SRC_HOST/luajit"
+        echo "/work/$SRC_TARGET/luajit \"\$@\"" >> "$WRAPPER_HOST"
     fi
+    chmod +x "$WRAPPER_HOST"
+    HOST_LUAJIT_PATH="$WRAPPER_CONTAINER"
 
     dx_run "meson setup $BUILD_DIR --cross-file $CROSS_FILE -Dluajit_lib_dir=$SRC_TARGET -Dluajit_src_dir=$SRC_TARGET -Dhost_luajit=$HOST_LUAJIT_PATH -Dc_args='$EXTRA_CFLAGS' -Dc_link_args='$EXTRA_CFLAGS'"
 fi
 
 echo "Running Meson build for $TARGET..."
-dx_run "export PATH=/work/$SRC_HOST:\$PATH && meson compile -C $BUILD_DIR"
+dx_run "meson compile -C $BUILD_DIR"
 
 echo "Stripping $TARGET binary..."
 dx_run "${CROSS_PREFIX}strip $BUILD_DIR/luajit-standalone"
