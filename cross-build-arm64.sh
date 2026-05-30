@@ -13,122 +13,46 @@ if [ ! -f "$DOCKCROSS_BIN" ]; then
     chmod +x "$DOCKCROSS_BIN"
 fi
 
-# Create build directory
-mkdir -p "$BUILD_DIR"
-
-echo "Building host LuaJIT for bundling tools..."
-make clean > /dev/null
-make -j$(nproc) BUILDMODE=static > /dev/null
-cp src/luajit "$BUILD_DIR/host-luajit"
-make clean > /dev/null
-
 # Helper to run commands inside dockcross
 function dx_run() {
     "$DOCKCROSS_BIN" bash -c "$1"
 }
 
-echo "Building LuaJIT for arm64..."
-# Build LuaJIT statically. We use BUILDMODE=static to avoid .so build errors with -static flags.
-dx_run "make clean && make -j$(nproc) HOST_CC=gcc CROSS=aarch64-unknown-linux-gnu- TARGET_SYS=Linux BUILDMODE=static"
+echo "Building LuaJIT core (host and target)..."
 
-# Copy libluajit.a and headers to build directory
-cp src/libluajit.a "$BUILD_DIR/"
-mkdir -p "$BUILD_DIR/include"
-cp src/lua.h src/lualib.h src/lauxlib.h src/luaconf.h src/lua.hpp src/luajit.h "$BUILD_DIR/include/"
+# Build host LuaJIT incrementally in a separate directory
+if [ ! -d "src-host" ]; then
+    echo "Creating src-host for incremental host build..."
+    cp -r src src-host
+fi
+# Sync src-host if src changed (simple check)
+# In a real scenario, we might want rsync, but cp is okay for now if we want to be safe.
+# Actually, for incremental build, we should only copy if newer.
+cp -u src/* src-host/ 2>/dev/null || true
 
-echo "Building external modules..."
+echo "Building host LuaJIT..."
+dx_run "make -C src-host -j$(nproc) BUILDMODE=static"
 
-# LuaFileSystem
-echo "Building LuaFileSystem..."
-dx_run "cd external/luafilesystem && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -c src/lfs.c -o src/lfs.o && \
-       aarch64-unknown-linux-gnu-ar rcs ../../$BUILD_DIR/liblfs.a src/lfs.o"
+# Build target LuaJIT incrementally in a separate directory
+if [ ! -d "src-target" ]; then
+    echo "Creating src-target for incremental target build..."
+    cp -r src src-target
+fi
+cp -u src/* src-target/ 2>/dev/null || true
 
-# lua-cjson
-echo "Building lua-cjson..."
-dx_run "cd external/lua-cjson && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -c lua_cjson.c -o lua_cjson.o && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -c strbuf.c -o strbuf.o && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -c fpconv.c -o fpconv.o && \
-       aarch64-unknown-linux-gnu-ar rcs ../../$BUILD_DIR/libcjson.a lua_cjson.o strbuf.o fpconv.o"
+echo "Building target LuaJIT (arm64)..."
+dx_run "make -C src-target -j$(nproc) HOST_CC=gcc CROSS=aarch64-unknown-linux-gnu- TARGET_SYS=Linux BUILDMODE=static"
 
-# luasocket
-echo "Building luasocket..."
-# We compile both socket and mime cores into the same static library for simplicity
-dx_run "cd external/luasocket && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -Isrc -DLUASOCKET_INET_PTON -c src/auxiliar.c -o src/auxiliar.o && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -Isrc -DLUASOCKET_INET_PTON -c src/buffer.c -o src/buffer.o && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -Isrc -DLUASOCKET_INET_PTON -c src/except.c -o src/except.o && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -Isrc -DLUASOCKET_INET_PTON -c src/inet.c -o src/inet.o && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -Isrc -DLUASOCKET_INET_PTON -c src/io.c -o src/io.o && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -Isrc -DLUASOCKET_INET_PTON -c src/luasocket.c -o src/luasocket.o && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -Isrc -DLUASOCKET_INET_PTON -c src/options.c -o src/options.o && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -Isrc -DLUASOCKET_INET_PTON -c src/select.c -o src/select.o && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -Isrc -DLUASOCKET_INET_PTON -c src/tcp.c -o src/tcp.o && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -Isrc -DLUASOCKET_INET_PTON -c src/timeout.c -o src/timeout.o && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -Isrc -DLUASOCKET_INET_PTON -c src/udp.c -o src/udp.o && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -Isrc -DLUASOCKET_INET_PTON -c src/usocket.c -o src/usocket.o && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -Isrc -DLUASOCKET_INET_PTON -c src/mime.c -o src/mime.o && \
-       aarch64-unknown-linux-gnu-gcc -O2 -I../../src -Isrc -DLUASOCKET_INET_PTON -c src/compat.c -o src/compat.o && \
-       aarch64-unknown-linux-gnu-ar rcs ../../$BUILD_DIR/libluasocket.a src/auxiliar.o src/buffer.o src/except.o src/inet.o src/io.o src/luasocket.o src/options.o src/select.o src/tcp.o src/timeout.o src/udp.o src/usocket.o src/mime.o src/compat.o"
+# Ensure Meson is ready
+if [ ! -d "$BUILD_DIR" ]; then
+    echo "Setting up Meson build directory..."
+    # We need to make sure host-luajit is in the PATH inside the container.
+    # dockcross mounts the current dir as /work.
+    dx_run "export PATH=/work/src-host:\$PATH && meson setup $BUILD_DIR --cross-file arm64-cross.ini"
+fi
 
-echo "Bundling Lua modules..."
-BUNDLED_LUA_C="$BUILD_DIR/bundled_lua.c"
-echo '/* Automatically generated by cross-build-arm64.sh */' > "$BUNDLED_LUA_C"
-echo '#include "lua.h"' >> "$BUNDLED_LUA_C"
-echo '#include "lauxlib.h"' >> "$BUNDLED_LUA_C"
-
-# Helper to bundle a lua file
-# bundle_lua <file_path> <module_name> <symbol_name>
-function bundle_lua() {
-    local file=$1
-    local mod=$2
-    local sym=$3
-    echo "Bundling $mod ($file)..."
-    # Use host luajit to generate bytecode. Set LUA_PATH so it can find jit.* modules in src/
-    LUA_PATH="./src/?.lua;;" ./$BUILD_DIR/host-luajit -b -n "$mod" "$file" "$BUILD_DIR/tmp_bc.c"
-    LUA_PATH="./src/?.lua;;" ./$BUILD_DIR/host-luajit -b "$file" "$BUILD_DIR/tmp_bc.bin"
-    local size=$(stat -c%s "$BUILD_DIR/tmp_bc.bin")
-    # Append to our bundled C file, but rename the symbol to avoid dots
-    cat "$BUILD_DIR/tmp_bc.c" | sed "s/luaJIT_BC_$mod/luaJIT_BC_$sym/g" >> "$BUNDLED_LUA_C"
-    echo "const size_t luaJIT_BC_${sym}_size = $size;" >> "$BUNDLED_LUA_C"
-    rm "$BUILD_DIR/tmp_bc.c" "$BUILD_DIR/tmp_bc.bin"
-}
-
-# LuaJIT core
-bundle_lua src/jit/bc.lua jit.bc jit_bc
-bundle_lua src/jit/v.lua jit.v jit_v
-bundle_lua src/jit/dump.lua jit.dump jit_dump
-bundle_lua src/jit/p.lua jit.p jit_p
-bundle_lua src/jit/zone.lua jit.zone jit_zone
-bundle_lua src/jit/vmdef.lua jit.vmdef jit_vmdef
-bundle_lua src/jit/dis_arm64.lua jit.dis_arm64 jit_dis_arm64
-
-# LuaSocket
-bundle_lua external/luasocket/src/socket.lua socket socket
-bundle_lua external/luasocket/src/mime.lua mime mime
-bundle_lua external/luasocket/src/ltn12.lua ltn12 ltn12
-bundle_lua external/luasocket/src/http.lua socket.http socket_http
-bundle_lua external/luasocket/src/tp.lua socket.tp socket_tp
-bundle_lua external/luasocket/src/ftp.lua socket.ftp socket_ftp
-bundle_lua external/luasocket/src/smtp.lua socket.smtp socket_smtp
-bundle_lua external/luasocket/src/url.lua socket.url socket_url
-bundle_lua external/luasocket/src/headers.lua socket.headers socket_headers
-bundle_lua external/luasocket/src/mbox.lua socket.mbox socket_mbox
-
-# cjson
-bundle_lua external/lua-cjson/lua/cjson/util.lua cjson.util cjson_util
-
-echo "Final linking of standalone-luajit..."
-# Link everything statically. -static is used here to ensure no dynamic dependencies.
-# Note: Static linking with glibc may still have runtime dependencies for things like NSS.
-dx_run "aarch64-unknown-linux-gnu-gcc -O2 -static -I$BUILD_DIR/include \
-       src/standalone.c $BUNDLED_LUA_C \
-       -L$BUILD_DIR -lluajit -llfs -lcjson -lluasocket \
-       -lm -ldl -lpthread \
-       -o $BUILD_DIR/standalone-luajit"
-
-echo "Stripping standalone-luajit..."
-dx_run "aarch64-unknown-linux-gnu-strip $BUILD_DIR/standalone-luajit"
+echo "Running Meson build..."
+dx_run "export PATH=/work/src-host:\$PATH && meson compile -C $BUILD_DIR"
 
 echo "Build complete! Binary located at $BUILD_DIR/standalone-luajit"
+

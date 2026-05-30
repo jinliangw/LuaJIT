@@ -11,5 +11,7 @@
 *.swp
 .tags
 build-arm64/
+src-host/
+src-target/
 dockcross-linux-arm64
 test_standalone.lua
