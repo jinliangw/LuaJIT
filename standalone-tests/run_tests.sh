@@ -10,7 +10,7 @@ TEST_DIR="standalone-tests"
 
 case $TARGET in
     arm64) QEMU="qemu-aarch64" ;;
-    armv7) QEMU="qemu-arm" ;;
+    armv7sf) QEMU="qemu-arm" ;;
     x64)   QEMU="" ;;
     *) echo "Unsupported target: $TARGET"; exit 1 ;;
 esac

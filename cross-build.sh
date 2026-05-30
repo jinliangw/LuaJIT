@@ -3,7 +3,10 @@ set -e
 
 TARGET=$1
 if [ -z "$TARGET" ]; then
-    echo "Usage: $0 <arm64|armv7|x64>"
+    echo "Usage: $0 <arm64|armv7sf|x64>"
+    echo "  arm64:   ARMv8 64-bit."
+    echo "  armv7sf: ARMv7 without FPU (soft-float, optimized for v7)."
+    echo "  x64:     Standard 64-bit Linux."
     exit 1
 fi
 
@@ -14,13 +17,12 @@ case $TARGET in
         CROSS_PREFIX="aarch64-unknown-linux-gnu-"
         MAKE_FLAGS=""
         ;;
-    armv7)
-        IMAGE="dockcross/linux-armv7"
-        CROSS_FILE="armv7-cross.ini"
-        CROSS_PREFIX="armv7-unknown-linux-gnueabi-"
-        # For armv7 (32-bit), we use the cross-compiler for host tools and run them via qemu-arm
-        # This avoids the pointer size mismatch issue without needing gcc-multilib on the host.
-        MAKE_FLAGS="HOST_CC=${CROSS_PREFIX}gcc MINILUA_T='qemu-arm host/minilua' BUILDVM_T='qemu-arm host/buildvm'"
+    armv7sf)
+        IMAGE="dockcross/linux-armv5"
+        CROSS_FILE="armv7sf-cross.ini"
+        CROSS_PREFIX="armv5-unknown-linux-gnueabi-"
+        EXTRA_CFLAGS="-march=armv7-a"
+        MAKE_FLAGS="HOST_CC=${CROSS_PREFIX}gcc MINILUA_T='qemu-arm host/minilua' BUILDVM_T='qemu-arm host/buildvm' TARGET_CFLAGS='$EXTRA_CFLAGS'"
         ;;
     x64)
         IMAGE="dockcross/linux-x64"
@@ -81,9 +83,9 @@ dx_run "make -C $SRC_TARGET -j$(nproc) CROSS=$CROSS_PREFIX TARGET_SYS=Linux BUIL
 if [ ! -d "$BUILD_DIR" ]; then
     echo "Setting up Meson build directory $BUILD_DIR..."
     
-    # For 32-bit targets like armv7, we need a 32-bit luajit for bytecode bundling.
+    # For 32-bit targets like armv7/armv5, we need a 32-bit luajit for bytecode bundling.
     # The most reliable way is to use the target luajit via qemu.
-    if [ "$TARGET" == "armv7" ]; then
+    if [[ "$TARGET" == armv* ]]; then
         BUNDLE_LUAJIT="qemu-arm /work/$SRC_TARGET/luajit"
         # We need to create a wrapper script because Meson find_program needs an executable
         WRAPPER_HOST="$BUILD_DIR/luajit-wrapper.sh"
@@ -97,7 +99,7 @@ if [ ! -d "$BUILD_DIR" ]; then
         HOST_LUAJIT_PATH="/work/$SRC_HOST/luajit"
     fi
 
-    dx_run "meson setup $BUILD_DIR --cross-file $CROSS_FILE -Dluajit_lib_dir=$SRC_TARGET -Dluajit_src_dir=$SRC_TARGET -Dhost_luajit=$HOST_LUAJIT_PATH"
+    dx_run "meson setup $BUILD_DIR --cross-file $CROSS_FILE -Dluajit_lib_dir=$SRC_TARGET -Dluajit_src_dir=$SRC_TARGET -Dhost_luajit=$HOST_LUAJIT_PATH -Dc_args='$EXTRA_CFLAGS' -Dc_link_args='$EXTRA_CFLAGS'"
 fi
 
 echo "Running Meson build for $TARGET..."
