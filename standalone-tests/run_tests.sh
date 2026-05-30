@@ -24,13 +24,25 @@ TOTAL=0
 
 run_test() {
     local full_path=$1
-    local test_file=$(basename "$full_path")
+    # Get path relative to TEST_DIR
+    local relative_path=${full_path#$TEST_DIR/}
+    local test_dir=$(dirname "$relative_path")
+    local test_file=$(basename "$relative_path")
+    
     TOTAL=$((TOTAL+1))
-    echo -n "Running $test_file... "
+    echo -n "Running $relative_path... "
     
     # Run via qemu inside dockcross. 
-    # We cd into TEST_DIR inside the container so relative paths work.
-    output=$($DOCKCROSS bash -c "cd $TEST_DIR && qemu-aarch64 ../$STANDALONE_BIN $test_file" 2>&1)
+    # We cd into the test's directory inside the container so relative paths work.
+    if [ "$test_dir" = "." ]; then
+        cd_cmd="cd $TEST_DIR"
+        exec_path="../$STANDALONE_BIN"
+    else
+        cd_cmd="cd $TEST_DIR/$test_dir"
+        exec_path="../../$STANDALONE_BIN"
+    fi
+    
+    output=$($DOCKCROSS bash -c "$cd_cmd && qemu-aarch64 $exec_path $test_file" 2>&1)
     
     if [ $? -eq 0 ]; then
         echo "PASSED"
@@ -42,9 +54,9 @@ run_test() {
 }
 
 # Run tests
-for t in "$TEST_DIR"/test_*.lua; do
+while read -r t; do
     run_test "$t"
-done
+done < <(find "$TEST_DIR" -name "test_*.lua" | sort)
 
 echo "----------------------------------------"
 echo "Tests completed: $TOTAL, Passed: $((TOTAL-FAILED)), Failed: $FAILED"
