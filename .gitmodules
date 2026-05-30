@@ -7,3 +7,6 @@
 [submodule "external/luasocket"]
 	path = external/luasocket
 	url = https://github.com/lunarmodules/luasocket.git
+[submodule "external/penlight"]
+	path = external/penlight
+	url = https://github.com/lunarmodules/Penlight

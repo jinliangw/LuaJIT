@@ -115,6 +115,46 @@ extern const size_t luaJIT_BC_socket_mbox_size;
 extern const unsigned char luaJIT_BC_cjson_util[];
 extern const size_t luaJIT_BC_cjson_util_size;
 
+LUA_BUNDLE_DECL(pl)
+LUA_BUNDLE_DECL(pl_app)
+LUA_BUNDLE_DECL(pl_array2d)
+LUA_BUNDLE_DECL(pl_class)
+LUA_BUNDLE_DECL(pl_compat)
+LUA_BUNDLE_DECL(pl_comprehension)
+LUA_BUNDLE_DECL(pl_config)
+LUA_BUNDLE_DECL(pl_data)
+LUA_BUNDLE_DECL(pl_Date)
+LUA_BUNDLE_DECL(pl_dir)
+LUA_BUNDLE_DECL(pl_file)
+LUA_BUNDLE_DECL(pl_func)
+LUA_BUNDLE_DECL(pl_import_into)
+LUA_BUNDLE_DECL(pl_input)
+LUA_BUNDLE_DECL(pl_lapp)
+LUA_BUNDLE_DECL(pl_lexer)
+LUA_BUNDLE_DECL(pl_List)
+LUA_BUNDLE_DECL(pl_luabalanced)
+LUA_BUNDLE_DECL(pl_Map)
+LUA_BUNDLE_DECL(pl_MultiMap)
+LUA_BUNDLE_DECL(pl_operator)
+LUA_BUNDLE_DECL(pl_OrderedMap)
+LUA_BUNDLE_DECL(pl_path)
+LUA_BUNDLE_DECL(pl_permute)
+LUA_BUNDLE_DECL(pl_pretty)
+LUA_BUNDLE_DECL(pl_Set)
+LUA_BUNDLE_DECL(pl_seq)
+LUA_BUNDLE_DECL(pl_sip)
+LUA_BUNDLE_DECL(pl_strict)
+LUA_BUNDLE_DECL(pl_stringio)
+LUA_BUNDLE_DECL(pl_stringx)
+LUA_BUNDLE_DECL(pl_tablex)
+LUA_BUNDLE_DECL(pl_template)
+LUA_BUNDLE_DECL(pl_test)
+LUA_BUNDLE_DECL(pl_text)
+LUA_BUNDLE_DECL(pl_types)
+LUA_BUNDLE_DECL(pl_url)
+LUA_BUNDLE_DECL(pl_utils)
+LUA_BUNDLE_DECL(pl_xml)
+
 /* Helper to load bundled bytecode */
 static int load_bundled_bc(lua_State *L) {
     const unsigned char *bc = (const unsigned char *)lua_touserdata(L, lua_upvalueindex(1));
@@ -189,6 +229,46 @@ static void preload_modules(lua_State *L) {
     register_bundle(L, "socket.mbox", BUNDLE_BC(socket_mbox), BUNDLE_SIZE(socket_mbox));
 
     register_bundle(L, "cjson.util", BUNDLE_BC(cjson_util), BUNDLE_SIZE(cjson_util));
+
+    register_bundle(L, "pl", BUNDLE_BC(pl), BUNDLE_SIZE(pl));
+    register_bundle(L, "pl.app", BUNDLE_BC(pl_app), BUNDLE_SIZE(pl_app));
+    register_bundle(L, "pl.array2d", BUNDLE_BC(pl_array2d), BUNDLE_SIZE(pl_array2d));
+    register_bundle(L, "pl.class", BUNDLE_BC(pl_class), BUNDLE_SIZE(pl_class));
+    register_bundle(L, "pl.compat", BUNDLE_BC(pl_compat), BUNDLE_SIZE(pl_compat));
+    register_bundle(L, "pl.comprehension", BUNDLE_BC(pl_comprehension), BUNDLE_SIZE(pl_comprehension));
+    register_bundle(L, "pl.config", BUNDLE_BC(pl_config), BUNDLE_SIZE(pl_config));
+    register_bundle(L, "pl.data", BUNDLE_BC(pl_data), BUNDLE_SIZE(pl_data));
+    register_bundle(L, "pl.Date", BUNDLE_BC(pl_Date), BUNDLE_SIZE(pl_Date));
+    register_bundle(L, "pl.dir", BUNDLE_BC(pl_dir), BUNDLE_SIZE(pl_dir));
+    register_bundle(L, "pl.file", BUNDLE_BC(pl_file), BUNDLE_SIZE(pl_file));
+    register_bundle(L, "pl.func", BUNDLE_BC(pl_func), BUNDLE_SIZE(pl_func));
+    register_bundle(L, "pl.import_into", BUNDLE_BC(pl_import_into), BUNDLE_SIZE(pl_import_into));
+    register_bundle(L, "pl.input", BUNDLE_BC(pl_input), BUNDLE_SIZE(pl_input));
+    register_bundle(L, "pl.lapp", BUNDLE_BC(pl_lapp), BUNDLE_SIZE(pl_lapp));
+    register_bundle(L, "pl.lexer", BUNDLE_BC(pl_lexer), BUNDLE_SIZE(pl_lexer));
+    register_bundle(L, "pl.List", BUNDLE_BC(pl_List), BUNDLE_SIZE(pl_List));
+    register_bundle(L, "pl.luabalanced", BUNDLE_BC(pl_luabalanced), BUNDLE_SIZE(pl_luabalanced));
+    register_bundle(L, "pl.Map", BUNDLE_BC(pl_Map), BUNDLE_SIZE(pl_Map));
+    register_bundle(L, "pl.MultiMap", BUNDLE_BC(pl_MultiMap), BUNDLE_SIZE(pl_MultiMap));
+    register_bundle(L, "pl.operator", BUNDLE_BC(pl_operator), BUNDLE_SIZE(pl_operator));
+    register_bundle(L, "pl.OrderedMap", BUNDLE_BC(pl_OrderedMap), BUNDLE_SIZE(pl_OrderedMap));
+    register_bundle(L, "pl.path", BUNDLE_BC(pl_path), BUNDLE_SIZE(pl_path));
+    register_bundle(L, "pl.permute", BUNDLE_BC(pl_permute), BUNDLE_SIZE(pl_permute));
+    register_bundle(L, "pl.pretty", BUNDLE_BC(pl_pretty), BUNDLE_SIZE(pl_pretty));
+    register_bundle(L, "pl.Set", BUNDLE_BC(pl_Set), BUNDLE_SIZE(pl_Set));
+    register_bundle(L, "pl.seq", BUNDLE_BC(pl_seq), BUNDLE_SIZE(pl_seq));
+    register_bundle(L, "pl.sip", BUNDLE_BC(pl_sip), BUNDLE_SIZE(pl_sip));
+    register_bundle(L, "pl.strict", BUNDLE_BC(pl_strict), BUNDLE_SIZE(pl_strict));
+    register_bundle(L, "pl.stringio", BUNDLE_BC(pl_stringio), BUNDLE_SIZE(pl_stringio));
+    register_bundle(L, "pl.stringx", BUNDLE_BC(pl_stringx), BUNDLE_SIZE(pl_stringx));
+    register_bundle(L, "pl.tablex", BUNDLE_BC(pl_tablex), BUNDLE_SIZE(pl_tablex));
+    register_bundle(L, "pl.template", BUNDLE_BC(pl_template), BUNDLE_SIZE(pl_template));
+    register_bundle(L, "pl.test", BUNDLE_BC(pl_test), BUNDLE_SIZE(pl_test));
+    register_bundle(L, "pl.text", BUNDLE_BC(pl_text), BUNDLE_SIZE(pl_text));
+    register_bundle(L, "pl.types", BUNDLE_BC(pl_types), BUNDLE_SIZE(pl_types));
+    register_bundle(L, "pl.url", BUNDLE_BC(pl_url), BUNDLE_SIZE(pl_url));
+    register_bundle(L, "pl.utils", BUNDLE_BC(pl_utils), BUNDLE_SIZE(pl_utils));
+    register_bundle(L, "pl.xml", BUNDLE_BC(pl_xml), BUNDLE_SIZE(pl_xml));
 }
 
 static lua_State *globalL = NULL;
