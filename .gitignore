@@ -10,8 +10,8 @@
 *.dmp
 *.swp
 .tags
-build-arm64/
+build-*/
 src-host/
-src-target/
-dockcross-linux-arm64
+src-target-*/
+dockcross-*
 test_standalone.lua

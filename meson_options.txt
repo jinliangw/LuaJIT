@@ -1,0 +1,3 @@
+option('luajit_lib_dir', type: 'string', value: '', description: 'Directory containing libluajit.a')
+option('luajit_src_dir', type: 'string', value: '', description: 'Directory containing LuaJIT headers')
+option('host_luajit', type: 'string', value: '', description: 'Path to host LuaJIT for bundling')

@@ -2,12 +2,21 @@
 # Test runner for standalone-luajit
 # Should be run from the project root
 
-STANDALONE_BIN="build-arm64/standalone-luajit"
-DOCKCROSS="./dockcross-linux-arm64"
+TARGET=${1:-arm64}
+BUILD_DIR="build-$TARGET"
+STANDALONE_BIN="$BUILD_DIR/standalone-luajit"
+DOCKCROSS="./dockcross-$TARGET"
 TEST_DIR="standalone-tests"
 
+case $TARGET in
+    arm64) QEMU="qemu-aarch64" ;;
+    armv7) QEMU="qemu-arm" ;;
+    x64)   QEMU="" ;;
+    *) echo "Unsupported target: $TARGET"; exit 1 ;;
+esac
+
 if [ ! -f "$STANDALONE_BIN" ]; then
-    echo "Error: $STANDALONE_BIN not found. Run ./cross-build-arm64.sh first."
+    echo "Error: $STANDALONE_BIN not found. Run ./cross-build.sh $TARGET first."
     exit 1
 fi
 
@@ -16,8 +25,8 @@ if [ ! -f "$DOCKCROSS" ]; then
     exit 1
 fi
 
-echo "Starting standalone-luajit test suite..."
-echo "----------------------------------------"
+echo "Starting standalone-luajit test suite for $TARGET..."
+echo "----------------------------------------------------"
 
 FAILED=0
 TOTAL=0
@@ -32,7 +41,7 @@ run_test() {
     TOTAL=$((TOTAL+1))
     echo -n "Running $relative_path... "
     
-    # Run via qemu inside dockcross. 
+    # Run via qemu inside dockcross (if needed). 
     # We cd into the test's directory inside the container so relative paths work.
     if [ "$test_dir" = "." ]; then
         cd_cmd="cd $TEST_DIR"
@@ -42,7 +51,7 @@ run_test() {
         exec_path="../../$STANDALONE_BIN"
     fi
     
-    output=$($DOCKCROSS bash -c "$cd_cmd && qemu-aarch64 $exec_path $test_file" 2>&1)
+    output=$($DOCKCROSS bash -c "$cd_cmd && $QEMU $exec_path $test_file" 2>&1)
     
     if [ $? -eq 0 ]; then
         echo "PASSED"

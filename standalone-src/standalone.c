@@ -77,8 +77,19 @@ extern const unsigned char luaJIT_BC_jit_zone[];
 extern const size_t luaJIT_BC_jit_zone_size;
 extern const unsigned char luaJIT_BC_jit_vmdef[];
 extern const size_t luaJIT_BC_jit_vmdef_size;
+
+#if defined(__aarch64__)
 extern const unsigned char luaJIT_BC_jit_dis_arm64[];
 extern const size_t luaJIT_BC_jit_dis_arm64_size;
+#elif defined(__arm__)
+extern const unsigned char luaJIT_BC_jit_dis_arm[];
+extern const size_t luaJIT_BC_jit_dis_arm_size;
+#elif defined(__x86_64__)
+extern const unsigned char luaJIT_BC_jit_dis_x64[];
+extern const size_t luaJIT_BC_jit_dis_x64_size;
+extern const unsigned char luaJIT_BC_jit_dis_x86[];
+extern const size_t luaJIT_BC_jit_dis_x86_size;
+#endif
 
 extern const unsigned char luaJIT_BC_socket[];
 extern const size_t luaJIT_BC_socket_size;
@@ -156,7 +167,15 @@ static void preload_modules(lua_State *L) {
     register_bundle(L, "jit.p", BUNDLE_BC(jit_p), BUNDLE_SIZE(jit_p));
     register_bundle(L, "jit.zone", BUNDLE_BC(jit_zone), BUNDLE_SIZE(jit_zone));
     register_bundle(L, "jit.vmdef", BUNDLE_BC(jit_vmdef), BUNDLE_SIZE(jit_vmdef));
+
+#if defined(__aarch64__)
     register_bundle(L, "jit.dis_arm64", BUNDLE_BC(jit_dis_arm64), BUNDLE_SIZE(jit_dis_arm64));
+#elif defined(__arm__)
+    register_bundle(L, "jit.dis_arm", BUNDLE_BC(jit_dis_arm), BUNDLE_SIZE(jit_dis_arm));
+#elif defined(__x86_64__)
+    register_bundle(L, "jit.dis_x64", BUNDLE_BC(jit_dis_x64), BUNDLE_SIZE(jit_dis_x64));
+    register_bundle(L, "jit.dis_x86", BUNDLE_BC(jit_dis_x86), BUNDLE_SIZE(jit_dis_x86));
+#endif
 
     register_bundle(L, "socket", BUNDLE_BC(socket), BUNDLE_SIZE(socket));
     register_bundle(L, "mime", BUNDLE_BC(mime), BUNDLE_SIZE(mime));

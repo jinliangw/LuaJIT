@@ -11,7 +11,11 @@ dl_dep = cc.find_library('dl', required: false)
 thread_dep = dependency('threads')
 
 # Include directories
-inc = include_directories('src')
+luajit_src_dir = get_option('luajit_src_dir')
+if luajit_src_dir == ''
+  luajit_src_dir = 'src'
+endif
+inc = include_directories(luajit_src_dir)
 luasocket_inc = include_directories('external/luasocket/src')
 
 # External module sources
@@ -41,8 +45,14 @@ luasocket_src = files(
 )
 
 # Lua bytecode bundling
-host_luajit = find_program('luajit', native: true)
+host_luajit_path = get_option('host_luajit')
+if host_luajit_path != ''
+  host_luajit = find_program(host_luajit_path)
+else
+  host_luajit = find_program('luajit', native: true)
+endif
 
+# LuaJIT core files
 lua_files = [
   ['src/jit/bc.lua', 'jit.bc', 'jit_bc'],
   ['src/jit/v.lua', 'jit.v', 'jit_v'],
@@ -50,7 +60,23 @@ lua_files = [
   ['src/jit/p.lua', 'jit.p', 'jit_p'],
   ['src/jit/zone.lua', 'jit.zone', 'jit_zone'],
   ['src/jit/vmdef.lua', 'jit.vmdef', 'jit_vmdef'],
-  ['src/jit/dis_arm64.lua', 'jit.dis_arm64', 'jit_dis_arm64'],
+]
+
+# Architecture-specific disassembler
+cpu_family = host_machine.cpu_family()
+if cpu_family == 'aarch64'
+  lua_files += [['src/jit/dis_arm64.lua', 'jit.dis_arm64', 'jit_dis_arm64']]
+elif cpu_family == 'arm'
+  lua_files += [['src/jit/dis_arm.lua', 'jit.dis_arm', 'jit_dis_arm']]
+elif cpu_family == 'x86_64'
+  lua_files += [
+    ['src/jit/dis_x64.lua', 'jit.dis_x64', 'jit_dis_x64'],
+    ['src/jit/dis_x86.lua', 'jit.dis_x86', 'jit_dis_x86']
+  ]
+endif
+
+# External modules
+lua_files += [
   ['external/luasocket/src/socket.lua', 'socket', 'socket'],
   ['external/luasocket/src/mime.lua', 'mime', 'mime'],
   ['external/luasocket/src/ltn12.lua', 'ltn12', 'ltn12'],
@@ -87,11 +113,23 @@ bundled_lua_c = custom_target('bundled_lua_c',
 )
 
 # LuaJIT library
-luajit_lib = cc.find_library('luajit', dirs: meson.current_source_dir() / 'src-target')
+luajit_lib_dir = get_option('luajit_lib_dir')
+if luajit_lib_dir == ''
+  luajit_lib_dir = 'src-target'
+endif
+
+# find_library needs absolute paths for 'dirs'
+if not luajit_lib_dir.startswith('/')
+  luajit_lib_full_dir = meson.current_source_dir() / luajit_lib_dir
+else
+  luajit_lib_full_dir = luajit_lib_dir
+endif
+
+luajit_lib = cc.find_library('luajit', dirs: luajit_lib_full_dir)
 
 # Executable
 executable('standalone-luajit',
-  'src/standalone.c',
+  'standalone-src/standalone.c',
   bundled_lua_c,
   lfs_src,
   cjson_src,
