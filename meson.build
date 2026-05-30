@@ -128,7 +128,7 @@ endif
 luajit_lib = cc.find_library('luajit', dirs: luajit_lib_full_dir)
 
 # Executable
-executable('standalone-luajit',
+executable('luajit-standalone',
   'standalone-src/standalone.c',
   bundled_lua_c,
   lfs_src,

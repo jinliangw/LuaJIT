@@ -105,4 +105,7 @@ fi
 echo "Running Meson build for $TARGET..."
 dx_run "export PATH=/work/$SRC_HOST:\$PATH && meson compile -C $BUILD_DIR"
 
-echo "Build complete! Binary located at $BUILD_DIR/standalone-luajit"
+echo "Stripping $TARGET binary..."
+dx_run "${CROSS_PREFIX}strip $BUILD_DIR/luajit-standalone"
+
+echo "Build complete! Binary located at $BUILD_DIR/luajit-standalone"

@@ -4,7 +4,7 @@
 
 TARGET=${1:-arm64}
 BUILD_DIR="build-$TARGET"
-STANDALONE_BIN="$BUILD_DIR/standalone-luajit"
+STANDALONE_BIN="$BUILD_DIR/luajit-standalone"
 DOCKCROSS="./dockcross-$TARGET"
 TEST_DIR="standalone-tests"
 
