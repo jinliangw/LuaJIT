@@ -11,7 +11,4 @@
 *.swp
 .tags
 build-*/
-src-host/
-src-target-*/
 dockcross-*
-test_standalone.lua

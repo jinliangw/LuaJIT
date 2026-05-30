@@ -41,7 +41,7 @@ esac
 
 DOCKCROSS_BIN="./dockcross-$TARGET"
 BUILD_DIR="build-$TARGET"
-SRC_TARGET="src-target-$TARGET"
+SRC_TARGET="$BUILD_DIR/src-target"
 
 # Ensure dockcross helper script exists
 if [ ! -f "$DOCKCROSS_BIN" ]; then
@@ -60,15 +60,18 @@ echo "Building LuaJIT core ($TARGET)..."
 # Build target LuaJIT incrementally in a separate directory
 if [ ! -d "$SRC_TARGET" ]; then
     echo "Creating $SRC_TARGET for incremental target build..."
+    mkdir -p "$BUILD_DIR"
     cp -r src "$SRC_TARGET"
+    cp -r dynasm "$BUILD_DIR/dynasm"
 fi
 cp -u src/* "$SRC_TARGET/" 2>/dev/null || true
+cp -u dynasm/* "$BUILD_DIR/dynasm/" 2>/dev/null || true
 
 echo "Building target LuaJIT ($TARGET)..."
 dx_run "make -C $SRC_TARGET -j$(nproc) CROSS=$CROSS_PREFIX TARGET_SYS=Linux BUILDMODE=static $MAKE_FLAGS"
 
 # Ensure Meson is ready
-if [ ! -d "$BUILD_DIR" ]; then
+if [ ! -d "$BUILD_DIR/meson-private" ]; then
     echo "Setting up Meson build directory $BUILD_DIR..."
     
     # Create a wrapper script because Meson find_program needs an executable.
