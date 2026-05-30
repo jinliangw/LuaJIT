@@ -54,24 +54,24 @@ endif
 
 # LuaJIT core files
 lua_files = [
-  ['src/jit/bc.lua', 'jit.bc', 'jit_bc'],
-  ['src/jit/v.lua', 'jit.v', 'jit_v'],
-  ['src/jit/dump.lua', 'jit.dump', 'jit_dump'],
-  ['src/jit/p.lua', 'jit.p', 'jit_p'],
-  ['src/jit/zone.lua', 'jit.zone', 'jit_zone'],
-  ['src/jit/vmdef.lua', 'jit.vmdef', 'jit_vmdef'],
+  [luajit_src_dir / 'jit/bc.lua', 'jit.bc', 'jit_bc'],
+  [luajit_src_dir / 'jit/v.lua', 'jit.v', 'jit_v'],
+  [luajit_src_dir / 'jit/dump.lua', 'jit.dump', 'jit_dump'],
+  [luajit_src_dir / 'jit/p.lua', 'jit.p', 'jit_p'],
+  [luajit_src_dir / 'jit/zone.lua', 'jit.zone', 'jit_zone'],
+  [luajit_src_dir / 'jit/vmdef.lua', 'jit.vmdef', 'jit_vmdef'],
 ]
 
 # Architecture-specific disassembler
 cpu_family = host_machine.cpu_family()
 if cpu_family == 'aarch64'
-  lua_files += [['src/jit/dis_arm64.lua', 'jit.dis_arm64', 'jit_dis_arm64']]
+  lua_files += [[luajit_src_dir / 'jit/dis_arm64.lua', 'jit.dis_arm64', 'jit_dis_arm64']]
 elif cpu_family == 'arm'
-  lua_files += [['src/jit/dis_arm.lua', 'jit.dis_arm', 'jit_dis_arm']]
+  lua_files += [[luajit_src_dir / 'jit/dis_arm.lua', 'jit.dis_arm', 'jit_dis_arm']]
 elif cpu_family == 'x86_64'
   lua_files += [
-    ['src/jit/dis_x64.lua', 'jit.dis_x64', 'jit_dis_x64'],
-    ['src/jit/dis_x86.lua', 'jit.dis_x86', 'jit_dis_x86']
+    [luajit_src_dir / 'jit/dis_x64.lua', 'jit.dis_x64', 'jit_dis_x64'],
+    [luajit_src_dir / 'jit/dis_x86.lua', 'jit.dis_x86', 'jit_dis_x86']
   ]
 endif
 
@@ -129,7 +129,7 @@ luajit_lib = cc.find_library('luajit', dirs: luajit_lib_full_dir)
 
 # Executable
 executable('luajit-standalone',
-  'standalone-src/standalone.c',
+  'src/standalone.c',
   bundled_lua_c,
   lfs_src,
   cjson_src,
