@@ -1,82 +1,93 @@
 # Standalone luajit runtime
 
-- only depends on stable Linux kernel system call
-- cross build and static link luajit for arm64 using dockcross/linux-arm64 docker image.
-- Also support LuaFileSystem, cjson, LuaSocket as git modules
-- Pre-loads static C modules (`lfs`, `cjson`, `socket.core`, `mime.core`) in `src/standalone.c`.
-- Embeds core Lua modules as bytecode directly into the binary:
-    - LuaJIT `jit.*` components.
+- **Zero External Dependencies**: Only depends on stable Linux kernel system calls.
+- **Multi-Architecture Support**: Supports `arm64`, `armv7sf` (soft-float ARMv7), and `x64`.
+- **Integrated C Modules**: Includes `LuaFileSystem`, `lua-cjson`, and `LuaSocket` as built-in components.
+- **Embedded Lua Bytecode**: Core Lua modules are embedded as pre-compiled bytecode directly into the binary:
+    - LuaJIT `jit.*` components (including architecture-specific disassemblers).
     - LuaSocket's Lua-side components (`socket`, `mime`, `ltn12`, `socket.http`, etc.).
-    - cjson utility modules.
-- Full LuaJIT interpreter functionality supported (cli flags, REPL).
+    - `cjson.util` and `cjson.safe`.
+- **Full Interpreter Functionality**: Supports all standard LuaJIT CLI flags (`-e`, `-i`, `-j`, etc.) and the REPL.
 - **New Option `-m`**: Prints a comprehensive list of all supported modules, including standard LuaJIT libraries and all bundled/pre-loaded modules.
-- Build artifacts are placed in `build-arm64/`.
+- **Incremental Meson Build**: Uses Meson for fast, reliable builds and dependency management.
 
-- Submodule sources are patched during build and restored afterwards to maintain a clean state.
-- Produces a single, optimized, fully self-contained 1.4M binary.
+## Build System & Automation
+
+The project uses a unified build system capable of cross-compiling for multiple targets from a 64-bit Linux host.
+
+### 1. Unified Cross-Build Script
+The `cross-build.sh <target>` script manages the entire build process, including:
+- Fetching and managing target-specific `dockcross` Docker environments.
+- Managing independent build directories (`build-<target>/`) to ensure incremental builds don't conflict between architectures.
+- Handling 32-bit/64-bit pointer size mismatches during bytecode generation by using QEMU to run target-native tools on the host.
+
+### 2. Meson Integration
+Transitioning to Meson allowed for:
+- **True Incremental Builds**: Files are only recompiled if they or their dependencies change.
+- **Automated Bundling**: `gen_bundle.py` is integrated as a `custom_target`, automatically re-generating the embedded C arrays when Lua sources or the bundling tool change.
+- **Sanitized Submodules**: Custom logic in `gen_bundle.py` (e.g., truncating long strings in `cjson.util`) allows using upstream submodules without local modifications.
+
+### 3. CI/Automation
+The `build-and-test-all.sh` script provides a "one-touch" verification of the entire project across all supported architectures.
+
+## Supported Architectures & Optimizations
+
+| Target | Description | Toolchain / Image | Binary Size |
+| :--- | :--- | :--- | :--- |
+| **arm64** | ARMv8 64-bit | `dockcross/linux-arm64` | ~1.5M |
+| **armv7sf** | ARMv7 Soft-Float (AST2600) | `dockcross/linux-armv5` | ~1.4M |
+| **x64** | Standard 64-bit Linux | `dockcross/linux-x64` | ~2.0M |
+
+### ARMv7 (AST2600) Optimization
+The `armv7sf` target is specifically optimized for systems like the ASPEED AST2600. While it uses an "armv5" base for compatibility, it is compiled with `-march=armv7-a` to enable modern features:
+- **Hardware Atomics**: Uses `ldrex`/`strex` for faster GC and memory management.
+- **Thumb-2 ISA**: Mixed 16/32-bit instructions for better code density and cache utilization.
+- **Soft-Float**: Strictly adheres to soft-float requirements while leveraging ARMv7 pipeline optimizations.
 
 ## Module Analysis & Selection Rationale
 
-The selection of embedded `.lua` files was determined by analyzing the source structure and Makefiles of each component to identify mandatory dependencies for a "standalone" experience.
+The selection of embedded `.lua` files ensures a "batteries-included" experience without a filesystem.
 
 ### 1. LuaJIT Core (JIT Libraries)
 - **Source:** `src/jit/*.lua`
-- **Rationale:** These files are required for LuaJIT's high-level JIT control and introspection features (e.g., `-jdump`, `-jv`, `-jbc`). 
-- **Key Files:** `bc.lua`, `v.lua`, `dump.lua`, `p.lua`, `zone.lua`, and the architecture-specific `dis_arm64.lua`. `vmdef.lua` (generated during build) is also included as it contains VM-specific constants used by these libraries.
+- **Selection:** Automatically bundles the core JIT control libraries (`bc.lua`, `v.lua`, `dump.lua`, etc.) and the **architecture-specific disassembler** (e.g., `dis_arm64.lua` for arm64, `dis_arm.lua` for armv7sf).
 
 ### 2. LuaSocket (Hybrid Module)
 - **Source:** `external/luasocket/src/*.lua`
-- **Rationale:** LuaSocket follows a hybrid pattern where the low-level networking is in C (`socket.core`), but the public API and high-level protocols (HTTP, FTP, SMTP) are implemented in Lua.
-- **Selection:** Mirrors the standard LuaSocket installation. We bundle `socket.lua` (the main entry point), `mime.lua`, `ltn12.lua`, and all protocol implementations (`http`, `tp`, `ftp`, `smtp`, `url`, `headers`, `mbox`) to ensure high-level modules like `socket.http` work without a filesystem.
+- **Rationale:** Bundles `socket.lua`, `mime.lua`, `ltn12.lua`, and all protocol implementations (`http`, `tp`, `ftp`, `smtp`, `url`, `headers`, `mbox`). This allows high-level protocols like HTTP to work out-of-the-box.
 
 ### 3. lua-cjson
 - **Source:** `external/lua-cjson/lua/cjson/*.lua`
-- **Rationale:** While the core JSON logic is in C, the module often includes utility Lua scripts. `cjson.util` was bundled to provide the standard utility suite.
+- **Included:** `cjson.util` and the `cjson.safe` variant.
 
 ### 4. LuaFileSystem (Pure C)
-- Analysis:** LFS is a pure C module. Its entire API is contained within the compiled C archive, requiring no supplemental `.lua` files for operation.
+- **Status:** Pure C module; integrated via static linking with no supplemental `.lua` files required.
 
 ## Performance Considerations: Startup Speed
 
-Bundling and pre-loading modules does not negatively impact the startup speed of `standalone-luajit`. In many cases, it is faster than a standard LuaJIT installation.
+Bundling and pre-loading modules does not negatively impact startup speed; it is often faster than standard installations.
 
 ### 1. Lazy Loading via `package.preload`
-Registering modules in `package.preload` is a lightweight operation that merely adds an entry to a lookup table. The actual module code is **not** executed or loaded into the Lua state until the first time `require("name")` is called in a script. If a module is never required, it consumes zero CPU time during the session.
+Modules are registered in `package.preload`, meaning they consume zero CPU time until actually `require`'d.
 
 ### 2. Elimination of Disk I/O
-A standard `require` call triggers a search of the filesystem (`LUA_PATH`/`LUA_CPATH`), involving multiple system calls and disk reads. In the standalone binary:
-- **Search:** Instantaneous hash table lookup in memory.
-- **Load:** Direct memory copy from the binary's data segment, bypassing all disk I/O.
+The VM performs an instantaneous memory lookup instead of a filesystem crawl (`LUA_PATH` search).
 
 ### 3. Pre-compiled Bytecode
-All bundled Lua modules are stored as **pre-compiled bytecode**. This allows the VM to skip the parsing and compilation phase that occurs when loading standard `.lua` source files, leading to faster module initialization.
-
-### 4. Minimal Registration Overhead
-The startup overhead consists of approximately 20 table insertions in `package.preload`. This process takes only a few microseconds and is negligible compared to the overall initialization of the LuaJIT VM.
-
-### Comparison Summary
-| Feature | Standard LuaJIT | Standalone LuaJIT |
-| :--- | :--- | :--- |
-| **Module Search** | Filesystem crawl (Slow) | Memory lookup (Instant) |
-| **Module Loading** | Disk I/O | Memory segment (Fast) |
-| **Processing** | Source parsing/compilation | Bytecode loading (Faster) |
-| **Startup Overhead** | Negligible | Negligible (~20 table entries) |
+Storing modules as bytecode skips the parsing and compilation phase during `require`, significantly speeding up module initialization.
 
 ## Verification & Testing
 
-A comprehensive test suite is provided in the `standalone-tests/` directory to ensure the correctness of the standalone runtime and all integrated modules.
+A comprehensive, multi-architecture test suite is provided in `standalone-tests/`.
 
 ### 1. Test Coverage
-- **Core LuaJIT (`test_core.lua`):** Verifies JIT availability, basic VM loops, and FFI functionality.
-- **LuaFileSystem (`test_lfs.lua`):** Executes the full LFS suite for directory and file operations.
-- **lua-cjson (`test_cjson.lua`):** A massive suite (105 tests) for JSON encoding/decoding, UTF-8, and `cjson.safe`.
-- **LuaSocket (`test_socket_*.lua`):** Verifies `url`, `mime`, and `ltn12` modules.
+- **Core LuaJIT**: JIT availability, VM loops, FFI.
+- **LFS**: Full directory and file operation suite.
+- **lua-cjson**: Comprehensive encoding/decoding tests (100+ cases), including `cjson.safe`.
+- **LuaSocket**: URL parsing, MIME encoding, and LTN12 filters.
 
 ### 2. Automated Test Runner
-The `run_tests.sh` script automates the execution of the entire suite using the arm64 binary via QEMU within the dockcross container. It ensures correct path resolution for `dofile` and data files.
-
-**How to run:**
-```bash
-./standalone-tests/run_tests.sh
-```
-
+`run_tests.sh` automates execution using:
+- **Recursive Discovery**: Automatically finds all `test_*.lua` files in subdirectories.
+- **Context-Aware Execution**: Switches to the test's directory before running, ensuring relative data file paths (common in `lua-cjson` tests) remain valid.
+- **Cross-Architecture Emulation**: Uses the appropriate QEMU emulator for the target binary.
